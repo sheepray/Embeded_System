@@ -10,6 +10,7 @@ Note:
 
 
 	Using Timer3 Fast PWM Mode, in Channel A at pin5
+	20ms each cycle in 16MHz using 256 prescaler, needs TOP(1250) count;
 */
 
 #include <inttypes.h>
@@ -74,11 +75,11 @@ void timer3_init(){
 	TCCR3A |= _BV(COM3A1); //initialize COM3A1 to 1 and COM3A0 to 0 to 
 	TCCR3A &= ~(_BV(COM3A0)); //enable OC3A as the output
 	
-	//setup timer3 running in fast moodule (top: 0x00FF, 8-bits)
-	TCCR3A |= _BV(WGM30);
-	TCCR3A &= ~(_BV(WGM31));
+	//setup timer3 running in fast moodule(1110) (top: ICRn)
+	TCCR3A &= ~(_BV(WGM30));
+	TCCR3A |= _BV(WGM31);
 	TCCR3B |= _BV(WGM32);
-	TCCR3B &= ~(_BV(WGM33));
+	TCCR3B |= _BV(WGM33);
 
 
 	TCCR3B &= ~(_BV(CS32));
@@ -86,9 +87,12 @@ void timer3_init(){
 	//initialize the counter
 	TCNT3 = 0;
 
-	//run in 2014 scale
+	ICR3 = 1250;//top value
+	OCR3A = 300;//this value should change based on the button pressed
+
+	//run in 256 scale
 	TCCR3B |= _BV(CS32);
-	TCCR3B |= _BV(CS30);
+//	TCCR3B |= _BV(CS30);
 
 //	TIMSK3 |= _BV(TOIE3);
 
