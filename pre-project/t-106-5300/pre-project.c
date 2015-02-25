@@ -71,7 +71,7 @@ void timer1_init(){
 
 
 
-void timer3_init(){
+void timer3_init(uint8_t status_pina){
 	TCCR3A |= _BV(COM3A1); //initialize COM3A1 to 1 and COM3A0 to 0 to 
 	TCCR3A &= ~(_BV(COM3A0)); //enable OC3A as the output
 	
@@ -88,7 +88,15 @@ void timer3_init(){
 	TCNT3 = 0;
 
 	ICR3 = 1250;//top value
-	OCR3A = 300;//this value should change based on the button pressed
+	OCR3A = 0;//this value should change based on the button pressed
+	
+	if(status_pina == 0b01111111){
+		OCR3A = 94;//1.5ms
+	}
+	else if(status_pina == 0b10111111){
+		OCR3A = 109;// 1.75
+	}
+
 
 	//run in 256 scale
 	TCCR3B |= _BV(CS32);
@@ -125,7 +133,7 @@ int main(void){
 			status_pina = PINA; //if changed, store the PINA to status_pina;
 			LEDS_PORT = ~PINA; //light the LED;
 			timer1_init();    //initialize timer 1;
-			timer3_init();   //prepare for the PWM using timer 3;
+			timer3_init(status_pina);   //prepare for the PWM using timer 3;
 			
 			while(total_overflow < Required_overflow){
 				//LEDS_PORT = total_overflow;			
@@ -142,6 +150,10 @@ int main(void){
 			TCCR1B &= ~(_BV(CS10));
 			TCNT1 = 0;
 			total_overflow = 0;
+			
+			//stop timer3
+			TCCR3B &= ~(_BV(CS32));
+			TCCR3B &= ~(_BV(CS30));
 
 		}
 
