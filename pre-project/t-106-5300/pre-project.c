@@ -5,8 +5,11 @@ Note:
 	ATmega2560 runs:
 		16MHz clocks
 	Timer1/counter1 (16bits) will be chosen with scale of 256. So 3 second requies total:
-		0*2^16 + 62500; 
+		3*16M/1024 = 46875  =  0*2^16(--65536--) + 46875; 
 
+
+
+	Using Timer3 Fast PWM Mode, in Channel A at pin5
 */
 
 #include <inttypes.h>
@@ -25,7 +28,7 @@ Note:
 
 #define BUTTON_DDR DDRA
 #define Required_overflow 0
-#define Remained_count 62500// 56428
+#define Remained_count 46875//56428
 
 volatile uint8_t total_overflow;
 
@@ -46,11 +49,14 @@ if(total_overflow == 2){
 
 
 void timer1_init(){
-	//set up timer with scaler of 256
-	TCCR1B |= _BV(CS12);
+	//stop the timer first
+	TCCR1B &= ~(_BV(CS12));
+	TCCR1B &= ~(_BV(CS10));
+	TCNT1 = 0; 
 
-	//initialize counter
-	TCNT1 = 0;
+	//set up timer with scaler of 1024
+	TCCR1B |= _BV(CS12);
+	TCCR1B |= _BV(CS10);
 
 	//enable overflow interrupt;
 	TIMSK1 |= _BV(TOIE1);
@@ -64,9 +70,29 @@ void timer1_init(){
 
 
 
+void timer3_init(){
+	TCCR3A |= _BV(COM3A1); //initialize COM3A1 to 1 and COM3A0 to 0 to 
+	TCCR3A &= ~(_BV(COM3A0)); //enable OC3A as the output
+	
+	//setup timer3 running in fast moodule (top: 0x00FF, 8-bits)
+	TCCR3A |= _BV(WGM30);
+	TCCR3A &= ~(_BV(WGM31));
+	TCCR3B |= _BV(WGM32);
+	TCCR3B &= ~(_BV(WGM33));
 
 
+	TCCR3B &= ~(_BV(CS32));
+	TCCR3B &= ~(_BV(CS30));
+	//initialize the counter
+	TCNT3 = 0;
 
+	//run in 2014 scale
+	TCCR3B |= _BV(CS32);
+	TCCR3B |= _BV(CS30);
+
+//	TIMSK3 |= _BV(TOIE3);
+
+}
 
 //program setup
 void setup(){
@@ -74,6 +100,8 @@ void setup(){
 	BUTTON_DDR = 0x00;//Read from PORTA
 	PORTA = 0xff; // Activate PULL UP resistor
 
+	DDRE |= _BV(PE3);//set OC3A as output
+	
 }
 
 
@@ -81,22 +109,21 @@ void setup(){
 int main(void){
 	setup();
 
-	//initialize the LED
-//	LEDS_PORT ^= LEDS_PORT;
+	//initialize the LED, check if all LEDs are working.
 	LEDS_PORT = 0xff;
 	_delay_ms(500);
 	LEDS_PORT = 0x00;	
 	uint8_t status_pina = PINA;
-//timer1_init();
+
 	while(1){
 		//check PINA has changed or not
 		if(PINA != status_pina && PINA != 0xff){
 			status_pina = PINA; //if changed, store the PINA to status_pina;
 			LEDS_PORT = ~PINA; //light the LED;
-			//enble the timer interrupt;
-			timer1_init();
-
-			while(total_overflow <= Required_overflow){
+			timer1_init();    //initialize timer 1;
+			timer3_init();   //prepare for the PWM using timer 3;
+			
+			while(total_overflow < Required_overflow){
 				//LEDS_PORT = total_overflow;			
 			}
 
@@ -105,7 +132,11 @@ int main(void){
 			}
 			//time is up, turn off the LED;
 			LEDS_PORT = 0x00;
-			TCNT0 = 0;
+			
+			//stop timer1
+			TCCR1B &= ~(_BV(CS12));
+			TCCR1B &= ~(_BV(CS10));
+			TCNT1 = 0;
 			total_overflow = 0;
 
 		}
@@ -116,5 +147,3 @@ int main(void){
 	}
 	return 0;
 }
-
-
